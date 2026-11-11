@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>기업 이산화탄소 배출 현황 대시보드</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons CDN -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Chart.js CDN for trend visualizer -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar for list container */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .custom-pulse-red {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+      animation: pulse-red 2s infinite;
+    }
+    @keyframes pulse-red {
+      0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-200">
+          <i class="ph ph-plant text-2xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">에코트래커 CO₂ 현황 대시보드</h1>
+          <p class="text-xs text-slate-500">주요 100개 기업 가상 탄소 배출 통계 및 모니터링</p>
+        </div>
+      </div>
+      
+      <!-- Summary Badges -->
+      <div class="hidden sm:flex items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span> 심각: >7,000만 톤
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span> 주의: 3,000~7,000만 톤
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 안전: <3,000만 톤
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1 flex flex-col">
+    <!-- Top Stats Bar -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="p-3 bg-slate-100 rounded-lg text-slate-700">
+          <i class="ph ph-buildings text-xl"></i>
+        </div>
+        <div>
+          <div class="text-xs text-slate-500">분석 대상 기업</div>
+          <div class="text-lg font-bold text-slate-900" id="stat-total-companies">100개사</div>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="p-3 bg-rose-100 rounded-lg text-rose-600">
+          <i class="ph ph-warning-circle text-xl"></i>
+        </div>
+        <div>
+          <div class="text-xs text-slate-500">고배출 (심각 단계)</div>
+          <div class="text-lg font-bold text-rose-600" id="stat-high-count">0개사</div>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="p-3 bg-amber-100 rounded-lg text-amber-600">
+          <i class="ph ph-scales text-xl"></i>
+        </div>
+        <div>
+          <div class="text-xs text-slate-500">중간 배출 (주의)</div>
+          <div class="text-lg font-bold text-amber-600" id="stat-mid-count">0개사</div>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <div class="p-3 bg-emerald-100 rounded-lg text-emerald-600">
+          <i class="ph ph-leaf text-xl"></i>
+        </div>
+        <div>
+          <div class="text-xs text-slate-500">친환경 (안전)</div>
+          <div class="text-lg font-bold text-emerald-600" id="stat-low-count">0개사</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Master-Detail Split Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start">
+      
+      <!-- Left Column: Search & Company List (5 cols) -->
+      <section class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[740px] overflow-hidden">
+        <!-- Search & Filters -->
+        <div class="p-4 border-b border-slate-100 bg-slate-50/70 space-y-3">
+          <div class="relative">
+            <i class="ph ph-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-lg"></i>
+            <input 
+              type="text" 
+              id="search-input"
+              placeholder="기업명 또는 업종 검색..." 
+              class="w-full pl-10 pr-4 py-2 bg-white rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+            >
+          </div>
+
+          <!-- Filter buttons -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button class="filter-btn active px-3 py-1 text-xs font-semibold rounded-lg bg-slate-900 text-white transition" data-filter="all">전체</button>
+            <button class="filter-btn px-3 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition" data-filter="high">높음 (빨강)</button>
+            <button class="filter-btn px-3 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition" data-filter="mid">중간 (노랑)</button>
+            <button class="filter-btn px-3 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition" data-filter="low">적음 (초록)</button>
+            <select id="sort-select" class="ml-auto text-xs bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none">
+              <option value="emissions-desc">배출량 높은 순</option>
+              <option value="emissions-asc">배출량 낮은 순</option>
+              <option value="name-asc">기업명 가나다순</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Scrollable Company List -->
+        <div id="company-list-container" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-2">
+          <!-- Dynamically populated company items -->
+        </div>
+
+        <!-- List Footer Counter -->
+        <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 flex justify-between items-center">
+          <span id="filtered-count-text">기업 목록 불러오는 중...</span>
+          <span class="text-[11px] text-slate-400">기업을 클릭하면 상세 배출량이 나타납니다</span>
+        </div>
+      </section>
+
+      <!-- Right Column: Detail View (7 cols) -->
+      <section class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 min-h-[740px] flex flex-col justify-between" id="detail-card">
+        <!-- Initial Blank Placeholder or Detailed Card Content -->
+        <div id="detail-empty" class="h-full flex flex-col items-center justify-center text-center p-8 my-auto">
+          <div class="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+            <i class="ph ph-hand-pointing text-3xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-slate-800">왼쪽 목록에서 기업을 선택해주세요</h3>
+          <p class="text-sm text-slate-500 max-w-sm mt-1">기업별 이산화탄소(CO₂) 배출량 현황과 위험 등급 색상, 지난 5개년 배출 추이를 한눈에 확인할 수 있습니다.</p>
+        </div>
+
+        <!-- Detail Content Container (hidden by default) -->
+        <div id="detail-content" class="hidden space-y-6">
+          
+          <!-- Company Header & Color-coded status badge -->
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-100">
+            <div>
+              <div class="flex items-center gap-2">
+                <span id="detail-sector-badge" class="px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">업종</span>
+                <span id="detail-rank" class="text-xs text-slate-400 font-medium">배출 순위 #1</span>
+              </div>
+              <h2 id="detail-company-name" class="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">기업명</h2>
+              <p id="detail-company-desc" class="text-xs text-slate-500 mt-1">지속가능경영 보고서 기준 온실가스 집계 현황</p>
+            </div>
+
+            <!-- Big Indicator Badge -->
+            <div id="detail-grade-badge" class="px-4 py-2.5 rounded-xl border flex items-center gap-2.5 self-start">
+              <span id="detail-grade-dot" class="w-3.5 h-3.5 rounded-full inline-block"></span>
+              <div>
+                <div id="detail-grade-label" class="text-sm font-bold leading-none">배출 등급</div>
+                <div id="detail-grade-sub" class="text-[11px] opacity-80 mt-0.5">판정 기준</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Primary Metric Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <!-- CO2 Emission Card (The primary color emphasized block) -->
+            <div id="metric-emission-box" class="sm:col-span-2 p-5 rounded-2xl border transition-all duration-300">
+              <div class="text-xs font-semibold uppercase tracking-wider opacity-80 flex items-center justify-between">
+                <span>연간 이산화탄소 총 배출량</span>
+                <i class="ph ph-cloud-fog text-lg"></i>
+              </div>
+              <div class="mt-2 flex items-baseline gap-2">
+                <span id="detail-emission-val" class="text-4xl font-black">0</span>
+                <span class="text-sm font-bold">만 톤 CO₂eq</span>
+              </div>
+              <div class="mt-3 text-xs flex items-center gap-1.5 opacity-90" id="detail-emission-status-msg">
+                <!-- Color-driven status description -->
+              </div>
+            </div>
+
+            <!-- Intensity / Efficiency Card -->
+            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 flex flex-col justify-between">
+              <div>
+                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">탄소 집약도</div>
+                <div class="mt-2 flex items-baseline gap-1">
+                  <span id="detail-intensity-val" class="text-2xl font-bold text-slate-800">0.00</span>
+                  <span class="text-xs text-slate-500">tCO₂/억원</span>
+                </div>
+              </div>
+              <div class="mt-3 text-[11px] text-slate-400">
+                매출액 대비 탄소 발생 효율 지수
+              </div>
+            </div>
+          </div>
+
+          <!-- Color Gauge Bar -->
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div class="flex justify-between items-center text-xs text-slate-600 mb-2 font-medium">
+              <span>배출량 레벨 게이지</span>
+              <span id="gauge-percent-text" class="font-bold text-slate-900">0%</span>
+            </div>
+            <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden flex relative">
+              <!-- Visual threshold ticks -->
+              <div class="h-full w-[30%] bg-emerald-400" title="안전 구간 (3,000만 톤 이하)"></div>
+              <div class="h-full w-[40%] bg-amber-400" title="주의 구간 (3,000만 ~ 7,000만 톤)"></div>
+              <div class="h-full w-[30%] bg-rose-500" title="심각 구간 (7,000만 톤 초과)"></div>
+              
+              <!-- Pointer Pin -->
+              <div id="gauge-pin" class="absolute top-0 bottom-0 w-1.5 bg-slate-900 shadow-md transform -translate-x-1/2 transition-all duration-500" style="left: 0%;"></div>
+            </div>
+            <div class="flex justify-between text-[11px] text-slate-400 mt-1.5">
+              <span>0 (친환경)</span>
+              <span>3,000만 톤</span>
+              <span>7,000만 톤</span>
+              <span>10,000만 톤</span>
+            </div>
+          </div>
+
+          <!-- 5-Year Trend Chart -->
+          <div class="border border-slate-200 rounded-xl p-4 bg-white">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                <i class="ph ph-chart-line-up text-emerald-600"></i>
+                최근 5개년 배출량 추이 (만 톤)
+              </h4>
+              <span class="text-xs text-slate-400">2022 ~ 2026(E)</span>
+            </div>
+            <div class="h-44 w-full">
+              <canvas id="trendChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Action / Recommendation Tips -->
+          <div id="detail-solution-box" class="p-4 rounded-xl border text-xs leading-relaxed flex items-start gap-3">
+            <i class="ph ph-info text-lg shrink-0 mt-0.5"></i>
+            <div id="detail-recommendation-text">권고 사항이 여기에 표시됩니다.</div>
+          </div>
+
+        </div>
+
+        <!-- Footer note inside detail card -->
+        <div class="text-[11px] text-slate-400 pt-4 mt-auto border-t border-slate-100 flex items-center justify-between">
+          <span>* 본 데이터는 시뮬레이션을 위해 생성된 가상 수치입니다.</span>
+          <button id="copy-btn" class="hover:text-slate-600 flex items-center gap-1 text-slate-500 transition">
+            <i class="ph ph-copy"></i> 정보 복사
+          </button>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    // --- 1. DATA GENERATION: 100 VIRTUAL COMPANIES ---
+    const SECTORS = [
+      { name: "제조 / 철강", baseMin: 4500, baseMax: 9800 },
+      { name: "에너지 / 정유", baseMin: 5000, baseMax: 9950 },
+      { name: "화학 / 신소재", baseMin: 3500, baseMax: 8200 },
+      { name: "운송 / 해운", baseMin: 2500, baseMax: 7100 },
+      { name: "IT / 통신", baseMin: 300, baseMax: 2900 },
+      { name: "식품 / 유통", baseMin: 600, baseMax: 3400 },
+      { name: "금융 / 핀테크", baseMin: 80, baseMax: 1200 },
+      { name: "건설 / 중공업", baseMin: 2800, baseMax: 7600 },
+      { name: "바이오 / 헬스케어", baseMin: 150, baseMax: 2200 },
+      { name: "신재생 에너지", baseMin: 50, baseMax: 1400 }
+    ];
+
+    const NAME_PREFIXES = [
+      "한국", "글로벌", "대한", "태양", "미래", "한빛", "성원", "대성", "넥스트", "한일",
+      "아세아", "삼진", "그린", "동방", "하이텍", "신한", "오리온", "한양", "세종", "에코"
+    ];
+
+    const NAME_SUFFIXES = [
+      "스틸", "화학", "에너지", "인더스트리", "홀딩스", "테크", "네트웍스", "글로벌", "물산", "중공업",
+      "솔루션", "시스템", "파워", "머티리얼즈", "로지스틱스", "바이오", "코퍼레이션", "엔지니어링", "개발", "정밀"
+    ];
+
+    function generateCompanies() {
+      const list = [];
+      let idCounter = 1;
+
+      // Deterministic pseudo-random seed helper for consistent realistic data
+      let seed = 42;
+      function random() {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      }
+
+      // Generate 100 unique realistic company profiles
+      for (let i = 0; i < 100; i++) {
+        const pIndex = Math.floor(random() * NAME_PREFIXES.length);
+        const sIndex = Math.floor(random() * NAME_SUFFIXES.length);
+        const sector = SECTORS[Math.floor(random() * SECTORS.length)];
+        
+        // Generate emission between min and max (in 10,000 metric tons)
+        const range = sector.baseMax - sector.baseMin;
+        const emission = Math.round(sector.baseMin + (random() * range));
+
+        // Generate 5-year history
+        const history = [];
+        let curr = emission * 0.94;
+        for (let y = 0; y < 5; y++) {
+          const delta = (random() - 0.47) * (emission * 0.08);
+          curr = Math.max(50, Math.round(curr + delta));
+          history.push(curr);
+        }
+        history[4] = emission; // current year matches exactly
+
+        // Carbon intensity (tCO2 per 100M KRW)
+        const intensity = (emission / (20 + random() * 100)).toFixed(2);
+
+        // Assign category
+        // High (Red): > 7000
+        // Mid (Yellow): 3000 ~ 7000
+        // Low (Green): < 3000
+        let level = 'mid';
+        if (emission > 7000) {
+          level = 'high';
+        } else if (emission < 3000) {
+          level = 'low';
+        }
+
+        const compName = `${NAME_PREFIXES[pIndex]}${NAME_SUFFIXES[sIndex]} ${(i >= 50) ? (i - 49) + '호' : ''}`.trim();
+
+        list.push({
+          id: idCounter++,
+          name: compName,
+          sector: sector.name,
+          emission: emission, // Unit: 10,000 Metric Tons CO2
+          intensity: intensity,
+          level: level,
+          history: history
+        });
+      }
+
+      // Sort by emissions descending initially
+      list.sort((a, b) => b.emission - a.emission);
+      return list;
+    }
+
+    const companies = generateCompanies();
+
+    // --- 2. APPLICATION STATE ---
+    let selectedCompanyId = null;
+    let activeFilter = 'all';
+    let searchQuery = '';
+    let sortOption = 'emissions-desc';
+    let trendChartInstance = null;
+
+    // --- 3. DOM ELEMENTS ---
+    const companyListContainer = document.getElementById('company-list-container');
+    const searchInput = document.getElementById('search-input');
+    const sortSelect = document.getElementById('sort-select');
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const filteredCountText = document.getElementById('filtered-count-text');
+
+    // Detail DOM
+    const detailEmpty = document.getElementById('detail-empty');
+    const detailContent = document.getElementById('detail-content');
+    const detailSectorBadge = document.getElementById('detail-sector-badge');
+    const detailRank = document.getElementById('detail-rank');
+    const detailCompanyName = document.getElementById('detail-company-name');
+    const detailGradeBadge = document.getElementById('detail-grade-badge');
+    const detailGradeDot = document.getElementById('detail-grade-dot');
+    const detailGradeLabel = document.getElementById('detail-grade-label');
+    const detailGradeSub = document.getElementById('detail-grade-sub');
+    const metricEmissionBox = document.getElementById('metric-emission-box');
+    const detailEmissionVal = document.getElementById('detail-emission-val');
+    const detailEmissionStatusMsg = document.getElementById('detail-emission-status-msg');
+    const detailIntensityVal = document.getElementById('detail-intensity-val');
+    const gaugePercentText = document.getElementById('gauge-percent-text');
+    const gaugePin = document.getElementById('gauge-pin');
+    const detailSolutionBox = document.getElementById('detail-solution-box');
+    const detailRecommendationText = document.getElementById('detail-recommendation-text');
+    const copyBtn = document.getElementById('copy-btn');
+
+    // Stats Bar
+    const statHighCount = document.getElementById('stat-high-count');
+    const statMidCount = document.getElementById('stat-mid-count');
+    const statLowCount = document.getElementById('stat-low-count');
+
+    // --- 4. COLOR THEME SCHEMES ---
+    const LEVEL_STYLES = {
+      high: {
+        badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+        dotBg: 'bg-rose-500',
+        cardBox: 'bg-rose-50 border-rose-200 text-rose-900',
+        borderLeft: 'border-l-rose-500',
+        accentText: 'text-rose-600',
+        label: '위험 (고배출)',
+        sub: '7,000만 톤 초과',
+        recommendation: '탄소 배출량이 매우 높아 탄소배출권 매입 비용 부담 및 ESG 규제 위험이 심각합니다. 신재생 에너지 전환 및 공정 효율화 설비 투자가 시급합니다.',
+        chartColor: 'rgb(244, 63, 94)',
+        chartBg: 'rgba(244, 63, 94, 0.12)'
+      },
+      mid: {
+        badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+        dotBg: 'bg-amber-500',
+        cardBox: 'bg-amber-50 border-amber-200 text-amber-900',
+        borderLeft: 'border-l-amber-500',
+        accentText: 'text-amber-600',
+        label: '주의 (중간 배출)',
+        sub: '3,000 ~ 7,000만 톤',
+        recommendation: '산업 평균 수준의 배출량이나, 향후 탄소국경조정제도(CBAM) 등 글로벌 탄소 규제 강화에 대응하기 위해 탄소 저감 중장기 로드맵 실천이 필요합니다.',
+        chartColor: 'rgb(245, 158, 11)',
+        chartBg: 'rgba(245, 158, 11, 0.12)'
+      },
+      low: {
+        badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        dotBg: 'bg-emerald-500',
+        cardBox: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+        borderLeft: 'border-l-emerald-500',
+        accentText: 'text-emerald-600',
+        label: '안전 (저배출)',
+        sub: '3,000만 톤 미만',
+        recommendation: '친환경 및 저탄소 구조가 정착되어 있습니다. 지속적인 RE100 이행과 친환경 인증 유지를 통해 녹색 금융 및 투자 유치에 우위를 점할 수 있습니다.',
+        chartColor: 'rgb(16, 185, 129)',
+        chartBg: 'rgba(16, 185, 129, 0.12)'
+      }
+    };
+
+    // --- 5. INITIALIZE SUMMARY STATS ---
+    function initStats() {
+      const high = companies.filter(c => c.level === 'high').length;
+      const mid = companies.filter(c => c.level === 'mid').length;
+      const low = companies.filter(c => c.level === 'low').length;
+
+      statHighCount.textContent = `${high}개사`;
+      statMidCount.textContent = `${mid}개사`;
+      statLowCount.textContent = `${low}개사`;
+    }
+
+    // --- 6. RENDER COMPANY LIST ---
+    function renderCompanyList() {
+      // Filter logic
+      let filtered = companies.filter(item => {
+        const matchesQuery = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                             item.sector.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesLevel = (activeFilter === 'all') || (item.level === activeFilter);
+        return matchesQuery && matchesLevel;
+      });
+
+      // Sort logic
+      filtered.sort((a, b) => {
+        if (sortOption === 'emissions-desc') return b.emission - a.emission;
+        if (sortOption === 'emissions-asc') return a.emission - b.emission;
+        if (sortOption === 'name-asc') return a.name.localeCompare(b.name, 'ko');
+        return 0;
+      });
+
+      filteredCountText.textContent = `총 ${filtered.length}개의 기업 표시 중`;
+      companyListContainer.innerHTML = '';
+
+      if (filtered.length === 0) {
+        companyListContainer.innerHTML = `
+          <div class="py-12 text-center text-slate-400">
+            <i class="ph ph-magnifying-glass text-3xl mb-2 inline-block"></i>
+            <p class="text-sm">조건에 맞는 기업이 없습니다.</p>
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach((comp) => {
+        const isSelected = comp.id === selectedCompanyId;
+        const style = LEVEL_STYLES[comp.level];
+
+        const item = document.createElement('div');
+        item.className = `p-3.5 rounded-xl cursor-pointer transition-all duration-150 flex items-center justify-between border-l-4 ${style.borderLeft} ${
+          isSelected 
+            ? 'bg-slate-100 shadow-sm ring-1 ring-slate-300' 
+            : 'hover:bg-slate-50 border border-transparent hover:border-slate-200'
+        }`;
+
+        item.addEventListener('click', () => {
+          selectCompany(comp.id);
+        });
+
+        // Small indicator circle color
+        let dotColorClass = style.dotBg;
+
+        item.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
+              comp.level === 'high' ? 'bg-rose-100 text-rose-700' :
+              comp.level === 'mid' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'
+            }">
+              ${comp.name.substring(0, 1)}
+            </div>
+            <div>
+              <div class="font-semibold text-sm text-slate-800 flex items-center gap-1.5">
+                ${comp.name}
+              </div>
+              <div class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                <span>${comp.sector}</span>
+              </div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm font-bold ${
+              comp.level === 'high' ? 'text-rose-600' :
+              comp.level === 'mid' ? 'text-amber-600' : 'text-emerald-600'
+            }">
+              ${comp.emission.toLocaleString()} <span class="text-xs font-normal text-slate-500">만 톤</span>
+            </div>
+            <span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+              <span class="w-1.5 h-1.5 rounded-full ${dotColorClass}"></span>
+              ${style.label.split(' ')[0]}
+            </span>
+          </div>
+        `;
+
+        companyListContainer.appendChild(item);
+      });
+    }
+
+    // --- 7. SELECT & DISPLAY DETAIL ---
+    function selectCompany(id) {
+      selectedCompanyId = id;
+      const comp = companies.find(c => c.id === id);
+      if (!comp) return;
+
+      // Update active selection appearance in left list
+      renderCompanyList();
+
+      // Show detail view
+      detailEmpty.classList.add('hidden');
+      detailContent.classList.remove('hidden');
+
+      const style = LEVEL_STYLES[comp.level];
+      const rank = companies.findIndex(c => c.id === comp.id) + 1;
+
+      // Basic Info
+      detailCompanyName.textContent = comp.name;
+      detailSectorBadge.textContent = comp.sector;
+      detailRank.textContent = `배출량 전체 ${rank}위 / 100개사`;
+
+      // Status Badge (Top-Right)
+      detailGradeBadge.className = `px-4 py-2.5 rounded-xl border flex items-center gap-2.5 self-start ${style.badgeBg}`;
+      detailGradeDot.className = `w-3 h-3 rounded-full ${style.dotBg}`;
+      detailGradeLabel.textContent = style.label;
+      detailGradeSub.textContent = style.sub;
+
+      // Primary Metric Box (Emissions)
+      metricEmissionBox.className = `sm:col-span-2 p-5 rounded-2xl border transition-all duration-300 ${style.cardBox}`;
+      detailEmissionVal.textContent = comp.emission.toLocaleString();
+      
+      let statusDescHtml = '';
+      if (comp.level === 'high') {
+        statusDescHtml = `<i class="ph ph-warning text-rose-600 text-base"></i> <span>고배출 경고: 기준선(7,000만 톤)을 초과한 심각 등급입니다.</span>`;
+      } else if (comp.level === 'mid') {
+        statusDescHtml = `<i class="ph ph-info text-amber-600 text-base"></i> <span>보통 수준: 배출량 저감을 위한 선제적 노력이 권장됩니다.</span>`;
+      } else {
+        statusDescHtml = `<i class="ph ph-check-circle text-emerald-600 text-base"></i> <span>친환경 안전: 모범적인 온실가스 저감 목표를 달성 중입니다.</span>`;
+      }
+      detailEmissionStatusMsg.innerHTML = statusDescHtml;
+
+      // Carbon Intensity
+      detailIntensityVal.textContent = comp.intensity;
+
+      // Gauge bar position (0 to 10,000 scale)
+      const percent = Math.min(100, Math.max(0, (comp.emission / 10000) * 100));
+      gaugePercentText.textContent = `${percent.toFixed(1)}% (기준대비)`;
+      gaugePin.style.left = `${percent}%`;
+
+      // Recommendations Box
+      detailSolutionBox.className = `p-4 rounded-xl border text-xs leading-relaxed flex items-start gap-3 ${style.badgeBg}`;
+      detailRecommendationText.innerHTML = `<strong>ESG 리포트 제언:</strong> ${style.recommendation}`;
+
+      // Update Chart
+      updateTrendChart(comp, style);
+    }
+
+    // --- 8. CHART.JS INTEGRATION ---
+    function updateTrendChart(company, style) {
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      const years = ['2022년', '2023년', '2024년', '2025년', '2026년(현재)'];
+
+      if (trendChartInstance) {
+        trendChartInstance.destroy();
+      }
+
+      trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: years,
+          datasets: [{
+            label: `${company.name} CO₂ 배출량`,
+            data: company.history,
+            borderColor: style.chartColor,
+            backgroundColor: style.chartBg,
+            fill: true,
+            tension: 0.35,
+            borderWidth: 2.5,
+            pointRadius: 4,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: style.chartColor,
+            pointBorderWidth: 2,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: '#1e293b',
+              padding: 10,
+              bodyFont: { size: 12 },
+              callbacks: {
+                label: function(context) {
+                  return ` 배출량: ${context.parsed.y.toLocaleString()} 만 톤`;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              grid: {
+                color: '#f1f5f9'
+              },
+              ticks: {
+                font: { size: 10 },
+                color: '#94a3b8',
+                callback: function(val) {
+                  return val.toLocaleString() + '만';
+                }
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                font: { size: 11 },
+                color: '#64748b'
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // --- 9. EVENT LISTENERS ---
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      renderCompanyList();
+    });
+
+    sortSelect.addEventListener('change', (e) => {
+      sortOption = e.target.value;
+      renderCompanyList();
+    });
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => {
+          b.classList.remove('bg-slate-900', 'text-white', 'active');
+          b.classList.add('bg-white', 'text-slate-600');
+        });
+        btn.classList.add('bg-slate-900', 'text-white', 'active');
+        btn.classList.remove('bg-white', 'text-slate-600');
+
+        activeFilter = btn.dataset.filter;
+        renderCompanyList();
+      });
+    });
+
+    // Copy company emission summary
+    copyBtn.addEventListener('click', () => {
+      if (!selectedCompanyId) return;
+      const comp = companies.find(c => c.id === selectedCompanyId);
+      if (!comp) return;
+
+      const text = `[에코트래커 탄소배출 정보]\n기업명: ${comp.name}\n업종: ${comp.sector}\n연간 CO₂ 배출량: ${comp.emission.toLocaleString()}만 톤\n위험도: ${LEVEL_STYLES[comp.level].label}`;
+      
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        const originalText = copyBtn.innerHTML;
+        copyBtn.innerHTML = `<i class="ph ph-check text-emerald-600"></i> 복사 완료!`;
+        setTimeout(() => {
+          copyBtn.innerHTML = originalText;
+        }, 1800);
+      } catch (err) {
+        console.error('Copy failed', err);
+      }
+      document.body.removeChild(textArea);
+    });
+
+    // --- 10. INITIALIZATION ON WINDOW LOAD ---
+    window.onload = function() {
+      initStats();
+      renderCompanyList();
+
+      // Automatically select the #1 emission company on load for immediate display
+      if (companies.length > 0) {
+        selectCompany(companies[0].id);
+      }
+    };
+  </script>
+</body>
+</html>
